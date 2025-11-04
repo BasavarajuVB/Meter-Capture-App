@@ -55,15 +55,34 @@ export default function HomePage() {
         setQrData(null);
 
         // Dynamically import html5-qrcode
-        const { Html5Qrcode } = await import("html5-qrcode");
+        const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import("html5-qrcode");
         
         const qrCode = new Html5Qrcode(qrContainerRef.current.id);
         
         const config = {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-          aspectRatio: 1.0,
-        };
+          fps: 24,
+          // Make the scan box responsive and larger to catch small QRs
+          qrbox: (() => {
+            const el = qrContainerRef.current as HTMLDivElement;
+            const w = el?.clientWidth ?? 320;
+            const h = el?.clientHeight ?? 320;
+            const base = Math.min(w, h);
+            const size = Math.max(220, Math.min(420, Math.floor(base * 0.85)));
+            return { width: size, height: size };
+          })(),
+          // Restrict to QR only to avoid other symbologies or false positives
+          formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+          // Ask for better focus to help small codes
+          videoConstraints: {
+            facingMode: facingMode,
+            focusMode: "continuous",
+            advanced: [{ focusMode: "continuous" }],
+          },
+          // Enable native BarcodeDetector if supported (accuracy boost)
+          experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+          // Avoid flipping for rear camera; improves decode
+          disableFlip: facingMode === "environment",
+        } as any;
 
         await qrCode.start(
           { facingMode: facingMode },
@@ -77,7 +96,7 @@ export default function HomePage() {
             }).catch(() => {});
           },
           (errorMessage) => {
-            // Ignore scanning errors, just keep scanning
+            // Ignore per-frame errors
           }
         );
 
